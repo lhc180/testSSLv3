@@ -1,27 +1,70 @@
 apply plugin: 'com.android.application'
 
 android {
-    compileSdkVersion 16
+    compileSdkVersion 21
     buildToolsVersion "21.1.1"
 
     defaultConfig {
         applicationId "org.robux4.testionsslv3"
         minSdkVersion 15
-        targetSdkVersion 16
+        targetSdkVersion 21
         versionCode 1
         versionName "1.0"
-    }
-    buildTypes {
-        release {
-            runProguard false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-        }
     }
 }
 
 dependencies {
-    compile 'com.android.support:support-v4:21.0.2'
+    def artifactSupportV4 = 'com.android.support:support-v4:21.+'
+    def artifactIon = 'com.koushikdutta.ion:ion:1.4.+'
+
+    def androidAsyncProject = ':AndroidAsync:AndroidAsync'
+    def ionProject = ':Ion:Ion'
+    def supportv4Project = ':support-v4'
+
+    def useLocalAndroidAsync = false
+    def useLocalIon = false
+    def useLocalV4 = false
+    allprojects {
+        rootProject.allprojects.project.each {
+            if (it.path == ionProject) {
+                useLocalIon = true
+            }
+            else if (it.path == androidAsyncProject) {
+                useLocalAndroidAsync = true
+            }
+            else if (it.path == supportv4Project) {
+                useLocalV4 = true
+            }
+        }
+    }
+
+    if (useLocalV4) {
+        println 'Using local support-v4 library in ' + project.path
+        compile project(supportv4Project)
+    } else {
+        compile artifactSupportV4
+    }
+
+    if (useLocalIon) {
+        println 'Using local Ion library in ' + project.path
+        compile project(ionProject)
+    } else {
+        compile (artifactIon) {
+            if (useLocalV4) {
+                println 'Exclude support-v4 dependency for' + artifactIon + ' in ' + project.path
+                exclude group: 'com.android.support', module: 'support-v4'
+            }
+            if (useLocalAndroidAsync) {
+                println 'Exclude androidasync dependency for' + artifactIon + ' in ' + project.path
+                exclude group: 'com.koushikdutta.async', module:'androidasync'
+            }
+        }
+    }
+
+    if (useLocalAndroidAsync) {
+        println 'Using local AndroidAsync library in ' + project.path
+        compile project(androidAsyncProject)
+    }
+
     compile 'com.google.android.gms:play-services:6.1.71'
-    compile 'com.koushikdutta.ion:ion:1.4.1'
-    //compile project(':Ion:Ion')
 }
