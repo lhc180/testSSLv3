@@ -6,6 +6,7 @@ import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.util.Log;
+import android.widget.ImageView;
 import android.widget.TextView;
 
 import com.google.gson.JsonObject;
@@ -17,6 +18,9 @@ import com.koushikdutta.ion.builder.Builders;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.ExecutionException;
 
 import javax.net.ssl.SSLEngine;
@@ -46,25 +50,20 @@ public class MainActivity extends Activity {
 		} catch (PackageManager.NameNotFoundException ignored) {
 		}
 
-		// install Conscrypt ourselves as 1.4.1 doesn't set it right
-		try {
-			Class<?> providerInstaller = Class.forName("com.google.android.gms.security.ProviderInstaller");
-			Method mInsertProvider = providerInstaller.getDeclaredMethod("installIfNeeded", Context.class);
-			mInsertProvider.invoke(null, this);
-
-		} catch (Throwable ignored) {
-			try {
-				Context gms = createPackageContext("com.google.android.gms", Context.CONTEXT_INCLUDE_CODE | Context.CONTEXT_IGNORE_SECURITY);
-				Class clazz = gms.getClassLoader().loadClass("com.google.android.gms.common.security.ProviderInstallerImpl");
-				Method mInsertProvider = clazz.getDeclaredMethod("insertProvider", Context.class);
-				mInsertProvider.invoke(null, this);
-			} catch (Throwable e) {
-			}
-		}
+		//Ion.getDefault(this).getConscryptMiddleware().enable(false);
 
 		Ion.getDefault(this).getHttpClient().getSSLSocketMiddleware().addEngineConfigurator(new AsyncSSLEngineConfigurator() {
 			@Override
 			public void configureEngine(SSLEngine engine, String host, int port) {
+				String[] protocols = engine.getEnabledProtocols();
+				if (protocols != null && protocols.length > 1) {
+					List<String> enabledProtocols = new ArrayList<String>(Arrays.asList(protocols));
+					if (enabledProtocols.remove("SSLv3")) {
+						protocols = enabledProtocols.toArray(new String[enabledProtocols.size()]);
+						engine.setEnabledProtocols(protocols);
+					}
+				}
+
 				if (!engine.getClass().getCanonicalName().contains(".conscrypt.")) {
 					runOnUiThread(new Runnable() {
 						@Override
@@ -98,6 +97,28 @@ public class MainActivity extends Activity {
 				}
 			}
 		});
+
+		// install Conscrypt ourselves as 1.4.1 doesn't set it right
+		try {
+			Class<?> providerInstaller = Class.forName("com.google.android.gms.security.ProviderInstaller");
+			Method mInsertProvider = providerInstaller.getDeclaredMethod("installIfNeeded", Context.class);
+			mInsertProvider.invoke(null, this);
+
+		} catch (Throwable ignored) {
+			try {
+				Context gms = createPackageContext("com.google.android.gms", Context.CONTEXT_INCLUDE_CODE | Context.CONTEXT_IGNORE_SECURITY);
+				Class clazz = gms.getClassLoader().loadClass("com.google.android.gms.common.security.ProviderInstallerImpl");
+				Method mInsertProvider = clazz.getDeclaredMethod("insertProvider", Context.class);
+				mInsertProvider.invoke(null, this);
+			} catch (Throwable e) {
+			}
+		}
+
+		Ion.with((ImageView) findViewById(R.id.imageView))
+				.load("http://cdn2.vox-cdn.com/thumbor/KxtZNw37jKNfxdA0hX5edHvbTBE=/0x0:2039x1359/800x536/cdn0.vox-cdn.com/uploads/chorus_image/image/44254028/lg-g-watch.0.0.jpg");
+
+		Ion.with((ImageView) findViewById(R.id.imageViewSSL))
+				.load("https://cdn2.vox-cdn.com/thumbor/KxtZNw37jKNfxdA0hX5edHvbTBE=/0x0:2039x1359/800x536/cdn0.vox-cdn.com/uploads/chorus_image/image/44254028/lg-g-watch.0.0.jpg");
 
 		new Thread() {
 			@Override

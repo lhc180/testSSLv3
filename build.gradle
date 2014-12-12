@@ -66,5 +66,5 @@ dependencies {
         compile project(androidAsyncProject)
     }
 
-    compile 'com.google.android.gms:play-services:6.1.71'
+    compile 'com.google.android.gms:play-services:6.5.+'
 }
