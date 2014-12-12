@@ -24,10 +24,11 @@ import javax.net.ssl.SSLEngine;
 
 public class MainActivity extends Activity {
 
+	private static final boolean FORCE_USE_SNI = true; // dual call fails when we for Conscrypt to use SNI
+	private static final int DELAY_BETWEEN_CALLS = 200; // ms
+
 	private final static String FEEDLY_OAUTH2_TOKEN = "At2PvX57ImkiOiJiZmRiNDVkMi01MmRiLTRkMWUtOWRhOS01OGM5YWVjYzJjMzUiLCJ1IjoiMTAxMjk2MjUyNDE1MzQ5MDM1NzgwIiwicCI6NiwiYSI6IkZlZWRseSBzYW5kYm94IGNsaWVudCIsInQiOjEzOTc3MTg4NzkwNzJ9:palabre";
 	private static final String LOG_TAG = "TOPHE";
-
-	private static final int DELAY_BETWEEN_CALLS = 200; // ms
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -61,19 +62,7 @@ public class MainActivity extends Activity {
 			}
 		}
 
-		//Ion.getDefault(this).getConscryptMiddleware().enable(true);
-
 		Ion.getDefault(this).getHttpClient().getSSLSocketMiddleware().addEngineConfigurator(new AsyncSSLEngineConfigurator() {
-			private static final boolean USE_SNI = false;
-			//private static final boolean REMOVE_SSLV3 = false;
-
-			/**
-			 * true  / true  : never finished
-			 * true  / false : finished
-			 * false / true  : finished
-			 * false / false : finished
-			 */
-
 			@Override
 			public void configureEngine(SSLEngine engine, String host, int port) {
 				if (!engine.getClass().getCanonicalName().contains(".conscrypt.")) {
@@ -85,7 +74,7 @@ public class MainActivity extends Activity {
 					});
 				}
 
-				if (USE_SNI) {
+				if (FORCE_USE_SNI) {
 					// temporary fix for https://github.com/koush/ion/issues/428
 					try {
 						Field sslParameters = engine.getClass().getDeclaredField("sslParameters");
@@ -107,77 +96,15 @@ public class MainActivity extends Activity {
 						Log.i(LOG_TAG, "Failed to set the flags in " + engine, e);
 					}
 				}
-/*
-				if (REMOVE_SSLV3) {
-					String[] protocols = engine.getEnabledProtocols();
-					if (protocols != null && protocols.length > 1) {
-						List<String> enabledProtocols = new ArrayList<String>(Arrays.asList(protocols));
-						if (enabledProtocols.remove("SSLv3")) {
-							protocols = enabledProtocols.toArray(new String[enabledProtocols.size()]);
-							engine.setEnabledProtocols(protocols);
-						}
-					}
-				}
-*/
 			}
 		});
-/*
-		if (false)
-		new Thread() {
-			@Override
-			public void run() {
-				JsonObject params = new JsonObject();
 
-				params.addProperty("code", "AiSmoJx7ImkiOiI5YTY1YjA3OS1mYjE5LTQ5N2EtODExOS05ZWZjNDk3ZmIzMDAiLCJ1IjoiMTA1MzUwMjc5NDQwMDU1NzgwOTM2IiwiYSI6IlBhbGFicmUiLCJwIjo2LCJ0IjoxNDE4MzgyODIzMjM0fQ");
-				params.addProperty("client_id", "palabre");
-				params.addProperty("client_secret", "FE01H48LRK62325VQVGYOZ24YFZL");
-				params.addProperty("redirect_uri", "palabre://feedlyauth");
-				params.addProperty("grant_type", "authorization_code");
-
-				Builders.Any.F authTokenFuture = Ion.getDefault(MainActivity.this)
-						.build(MainActivity.this)
-						.load("https://feedly.com/v3/auth/token")
-						.addHeader("X-Requested-With", "com.levelup.palabre")
-						.addHeader("Content-Length", "0")
-						.addHeader("User-Agent", "com.levelup.palabre/56 Ion-1.4.1+AndroidAsync-1.4.1")
-						//.addHeader("Authorization", "Bearer " + FEEDLY_OAUTH2_TOKEN)
-						.setJsonObjectBody(params);
-
-
-				Future<Response<JsonObject>> authTokenJob = authTokenFuture.asJsonObject().withResponse();
-
-				try {
-					Log.v(LOG_TAG, "read profile data");
-					final Response<JsonObject> profileResponse = authTokenJob.get();
-					Log.d(LOG_TAG, "auth token result="+profileResponse.getResult()+" ex="+profileResponse.getException());
-					runOnUiThread(new Runnable() {
-						@Override
-						public void run() {
-							if (profileResponse.getResult() != null) {
-								((TextView) findViewById(R.id.profile)).setText(String.valueOf(profileResponse.getResult()));
-							} else {
-								((TextView) findViewById(R.id.profile)).setText(String.valueOf(profileResponse.getException()));
-							}
-						}
-					});
-				} catch (InterruptedException e) {
-					e.printStackTrace();
-				} catch (ExecutionException e) {
-					e.printStackTrace();
-				}
-
-			}
-		}.start();
-*/
 		new Thread() {
 			@Override
 			public void run() {
 				Builders.Any.B profileJsonFuture = Ion.getDefault(MainActivity.this)
 						.build(MainActivity.this)
 						.load("https://feedly.com/v3/profile")
-						.addHeader("X-Requested-With", "com.levelup.palabre")
-						.addHeader("Content-Length", "0")
-						.addHeader("User-Agent", "com.levelup.palabre/56 Ion-1.4.1+AndroidAsync-1.4.1")
 						.addHeader("Authorization", "Bearer " + FEEDLY_OAUTH2_TOKEN);
 
 				Future<Response<JsonObject>> profileJsonJob = profileJsonFuture.asJsonObject().withResponse();
@@ -215,9 +142,6 @@ public class MainActivity extends Activity {
 				Builders.Any.B categoriesJsonFuture = Ion.getDefault(MainActivity.this)
 						.build(MainActivity.this)
 						.load("https://feedly.com/v3/categories")
-						.addHeader("X-Requested-With", "com.levelup.palabre")
-						.addHeader("Content-Length", "0")
-						.addHeader("User-Agent", "com.levelup.palabre/56 Ion-1.4.1+AndroidAsync-1.4.1")
 						.addHeader("Authorization", "Bearer " + FEEDLY_OAUTH2_TOKEN);
 
 				Future<Response<JsonObject>> categoriesJsonJob = categoriesJsonFuture.asJsonObject().withResponse();
