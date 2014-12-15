@@ -9,8 +9,10 @@ import android.util.Log;
 import android.widget.ImageView;
 import android.widget.TextView;
 
+import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.koushikdutta.async.future.Future;
+import com.koushikdutta.async.http.AsyncHttpClientMiddleware;
 import com.koushikdutta.async.http.AsyncSSLEngineConfigurator;
 import com.koushikdutta.ion.Ion;
 import com.koushikdutta.ion.Response;
@@ -29,9 +31,12 @@ import javax.net.ssl.SSLEngine;
 public class MainActivity extends Activity {
 
 	private static final boolean FORCE_USE_SNI = true; // dual call fails when we for Conscrypt to use SNI
+	private static final boolean DISABLE_SSLV3 = false;
+	private static final boolean DEBUG_ION = false;
 	private static final int DELAY_BETWEEN_CALLS = 200; // ms
 
-	private final static String FEEDLY_OAUTH2_TOKEN = "At2PvX57ImkiOiJiZmRiNDVkMi01MmRiLTRkMWUtOWRhOS01OGM5YWVjYzJjMzUiLCJ1IjoiMTAxMjk2MjUyNDE1MzQ5MDM1NzgwIiwicCI6NiwiYSI6IkZlZWRseSBzYW5kYm94IGNsaWVudCIsInQiOjEzOTc3MTg4NzkwNzJ9:palabre";
+	private final static String FEEDLY_DOMAIN = "sandbox.feedly.com";
+	private final static String FEEDLY_OAUTH2_TOKEN = "ArxsOch7ImEiOiJGZWVkbHkgc2FuZGJveCBjbGllbnQiLCJlIjoxNDE5MjQwNzEwNDI3LCJpIjoiZTkxMTFlOTAtN2Y1Mi00MTNiLThiZTYtYzc1OTBjMWZjZGYyIiwicCI6NiwidCI6MSwidiI6InNhbmRib3giLCJ3IjoiMjAxNC4yOCIsIngiOiJzdGFuZGFyZCJ9:sandbox";
 	private static final String LOG_TAG = "TOPHE";
 
 	@Override
@@ -39,7 +44,9 @@ public class MainActivity extends Activity {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_main);
 
-		//Ion.getDefault(this).configure().setLogging(LOG_TAG, Log.VERBOSE);
+		if (DEBUG_ION) {
+			Ion.getDefault(this).configure().setLogging(LOG_TAG, Log.VERBOSE);
+		}
 
 		// display the Play Services version used
 		try {
@@ -50,17 +57,19 @@ public class MainActivity extends Activity {
 		} catch (PackageManager.NameNotFoundException ignored) {
 		}
 
-		//Ion.getDefault(this).getConscryptMiddleware().enable(false);
+		Ion.getDefault(this).getConscryptMiddleware().enable(false);
 
 		Ion.getDefault(this).getHttpClient().getSSLSocketMiddleware().addEngineConfigurator(new AsyncSSLEngineConfigurator() {
 			@Override
-			public void configureEngine(SSLEngine engine, String host, int port) {
-				String[] protocols = engine.getEnabledProtocols();
-				if (protocols != null && protocols.length > 1) {
-					List<String> enabledProtocols = new ArrayList<String>(Arrays.asList(protocols));
-					if (enabledProtocols.remove("SSLv3")) {
-						protocols = enabledProtocols.toArray(new String[enabledProtocols.size()]);
-						engine.setEnabledProtocols(protocols);
+			public void configureEngine(SSLEngine engine, AsyncHttpClientMiddleware.GetSocketData data, String host, int port) {
+				if (DISABLE_SSLV3) {
+					String[] protocols = engine.getEnabledProtocols();
+					if (protocols != null && protocols.length > 1) {
+						List<String> enabledProtocols = new ArrayList<String>(Arrays.asList(protocols));
+						if (enabledProtocols.remove("SSLv3")) {
+							protocols = enabledProtocols.toArray(new String[enabledProtocols.size()]);
+							engine.setEnabledProtocols(protocols);
+						}
 					}
 				}
 
@@ -125,7 +134,7 @@ public class MainActivity extends Activity {
 			public void run() {
 				Builders.Any.B profileJsonFuture = Ion.getDefault(MainActivity.this)
 						.build(MainActivity.this)
-						.load("https://feedly.com/v3/profile")
+						.load("https://" + FEEDLY_DOMAIN + "/v3/profile")
 						.addHeader("Authorization", "Bearer " + FEEDLY_OAUTH2_TOKEN);
 
 				Future<Response<JsonObject>> profileJsonJob = profileJsonFuture.asJsonObject().withResponse();
@@ -162,14 +171,14 @@ public class MainActivity extends Activity {
 
 				Builders.Any.B categoriesJsonFuture = Ion.getDefault(MainActivity.this)
 						.build(MainActivity.this)
-						.load("https://feedly.com/v3/categories")
+						.load("https://" + FEEDLY_DOMAIN + "/v3/categories")
 						.addHeader("Authorization", "Bearer " + FEEDLY_OAUTH2_TOKEN);
 
-				Future<Response<JsonObject>> categoriesJsonJob = categoriesJsonFuture.asJsonObject().withResponse();
+				Future<Response<JsonArray>> categoriesJsonJob = categoriesJsonFuture.asJsonArray().withResponse();
 
 				try {
 					Log.v(LOG_TAG, "read categories data");
-					final Response<JsonObject> categoriesResponse = categoriesJsonJob.get();
+					final Response<JsonArray> categoriesResponse = categoriesJsonJob.get();
 					Log.d(LOG_TAG, "categories result="+categoriesResponse.getResult()+" ex="+categoriesResponse.getException());
 					runOnUiThread(new Runnable() {
 						@Override
